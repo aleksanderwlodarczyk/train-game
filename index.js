@@ -14,7 +14,7 @@ var user_number;
 var score = 0;
 var buttonapp = io.of('/buttonapp');
 buttonapp.on('connection', function(socket){
-	console.log('a user connected');
+	console.log('socket connected:\nsocketData: ' + socket);
 	
 	if(user_number)
 		socket.emit('change', user_number);
