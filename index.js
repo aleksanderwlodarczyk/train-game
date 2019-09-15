@@ -5,6 +5,7 @@ var io = require('socket.io')(http);
 var fs = require('fs');
 
 app.get('/', function(req, res){
+	console.log(req.rawHeaders.toString() + " is trying to connect");
 	res.sendFile(__dirname + '/index.html');
 });
 
@@ -14,7 +15,7 @@ var user_number;
 var score = 0;
 var buttonapp = io.of('/buttonapp');
 buttonapp.on('connection', function(socket){
-	console.log('socket connected:\nsocketData: ' + socket);
+	console.log('socket connected');
 	
 	if(user_number)
 		socket.emit('change', user_number);
