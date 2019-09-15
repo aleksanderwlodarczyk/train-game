@@ -1,0 +1,185 @@
+<script
+  src="https://code.jquery.com/jquery-3.4.1.min.js"
+  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+  crossorigin="anonymous"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+@keyframes counterAnimation {
+  0% {
+    transform: translateY(-50%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(50%);
+    opacity: 0;
+  }
+}
+.counter {
+  font-size: 200px;
+  text-transform: uppercase;
+  animation: 1s ease-out 0s 1 counterAnimation;
+}
+</style>
+<script>
+	// TODO: a bit ugly because I apparently forgot how to code in JS :P
+
+	const difficulties = {
+		EASY : 'easy',
+		MEDIUM : 'medium',
+		HARD : 'hard'
+	}
+
+	var socket = io('/buttonapp');
+	
+	var images = [];
+	var good_images = [5, 11, 19];
+
+	var easy_points_to_add = 1;
+	var medium_points_to_add = 2;
+	var hard_points_to_add = 3;
+
+	var easy_timeout = 1000;
+	var medium_timeout = 500;
+	var hard_timeout = 250;
+
+	var points_to_add = easy_points_to_add;
+	var timeout = easy_timeout;
+	var current_difficulty = difficulties.EASY;
+
+	var my_nick;
+
+	for(var i = 2; i <= 20; i++)
+		images.push("/buttonapp/puzzle/" + (i<10 ? "0" : "") + i + ".jpg");
+	
+	socket.on('change', function(new_value) {
+		$("#inputbox").text(new_value);
+	});
+	
+	socket.on('game_start', function(player_number) {
+		points_to_add = easy_points_to_add;
+		timeout = easy_timeout;
+		stageCountdown(player_number)
+	});
+
+	function stageCountdown(player_number, difficulty = difficulties.EASY){
+		$("#entry").hide();
+		$("#game").show();
+		$("#player").text(player_number);
+		imageIndex = -1;
+		
+
+		switch(difficulty){
+			case difficulties.EASY:
+				points_to_add = easy_points_to_add;
+				timeout = easy_timeout;
+				break;
+			case difficulties.MEDIUM:
+				points_to_add = medium_points_to_add;
+				timeout = medium_timeout;
+				break;
+			case difficulties.HARD:
+				points_to_add = hard_points_to_add;
+				timeout = hard_timeout;
+				break;
+		}
+
+		current_difficulty = difficulty;
+		my_nick = player_number;
+		countdown(3, nextImage);
+	}
+	
+	socket.on('scores', function(score) {
+		$("#scores").text("wynik: " + score);
+
+		console.log("im trying to show score");
+	});
+	
+	function countdown(tick, callback)
+	{
+		if (tick == 0) {
+			$("#countdown").html('');
+			callback();
+		} else {
+			var counter = $("<div class='counter'></div>");
+			counter.text(tick);
+			$("#countdown").html(counter);
+			setTimeout(function() {
+				countdown(tick - 1, callback);
+			}, 1000);
+		}
+	}
+	
+	var imageIndex = -1;
+	var nextImageTimeout = -1;
+
+	function nextImage(from_button_press = false)
+	{
+		if(!from_button_press && good_images.indexOf(imageIndex) != -1){
+			socket.emit('subtract_point');
+		}
+
+		++imageIndex;
+		if (imageIndex >= images.length)
+		{
+			nextImageTimeout = -1;
+			imageIndex = -1;
+			finishGame();
+		}
+		else
+		{
+			$("#image").attr('src', images[imageIndex]);
+			$("#image").show();
+			nextImageTimeout = setTimeout(nextImage, timeout);
+		}
+	}
+	
+	function buttonPressed()
+	{
+		if (nextImageTimeout < 0)
+			return;
+		// TODO: good/bad
+		if(good_images.indexOf(imageIndex) != -1){
+			console.log("this is a good image!");
+			socket.emit('add_point', points_to_add);
+		}else{
+			socket.emit('subtract_point');
+		}
+		clearTimeout(nextImageTimeout);
+		nextImage(true);
+	}	
+	$(window).keypress(function (e) {
+		if (e.keyCode === 13) {
+			e.preventDefault();
+			buttonPressed();
+		}
+	});
+	
+	function finishGame()
+	{
+		socket.emit('game_end');
+		$("#entry").show();
+		$("#game").hide();
+		$("#image").hide();
+		$("#nicknamebox").text("");
+	}
+
+	function setNickname(nickname){
+		my_nick = nickname;
+		$("#nicknamebox").text(nickname);
+	}
+
+</script>
+
+<div id="entry">
+	<h1>Wprowadź nick</h1>
+	<h2 id="nicknamebox"></h2>
+	<input type="text" name="nick" id="nick" />
+	<button onclick="setNickname($('#nick').val());">Ustaw nick</button>
+	<button onclick="stageCountdown($('#nick').val(), difficulties.EASY);">Start</button>
+</div>
+<h2 id="scores"></h2>
+<div id="game" style="display: none;">
+	<h3 id="player">X</h3>
+	<img id="image" style="width: 300px; display: none;">
+	<div id="countdown"></div>
+</div>
